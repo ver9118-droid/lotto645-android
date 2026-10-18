@@ -1,0 +1,10 @@
+.buildozer/
+bin/
+__pycache__/
+*.pyc
+*.pyo
+*.log
+.kivy/
+data/lotto.db
+data/settings.json
+data/recommendations.json
