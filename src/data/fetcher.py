@@ -1,26 +1,79 @@
-"""Fetching lotto draw data from dhlottery (new API) and mirror fallback."""
+"""Fetching lotto draw data from dhlottery (new API) and mirror fallback.
 
+모바일(Android) 빌드용 사본입니다.
+외부 패키지(requests) 없이 **표준 라이브러리만** 사용합니다.
+(p4a 빌드에서 순수 파이썬 패키지 설치가 실패하는 문제를 근본적으로 제거하고,
+ APK 용량도 줄입니다. HTTPS 인증서는 앱에 포함한 CA 번들로 검증합니다.)
+"""
+
+import gzip
+import json
+import os
+import ssl
 import time
 import datetime
-import requests
+import urllib.parse
+import urllib.request
 from typing import List, Optional
 
 from .models import Draw
 from .. import config
 
 SESSION_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "User-Agent": "Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36",
     "X-Requested-With": "XMLHttpRequest",
     "Referer": "https://www.dhlottery.co.kr/lt645/result",
     "Accept": "application/json, text/javascript, */*; q=0.01",
 }
 
+_SSL_CTX = None
+
+
+def _ssl_context():
+    """HTTPS 인증서 검증 컨텍스트. 앱에 포함된 CA 번들을 우선 사용."""
+    global _SSL_CTX
+    if _SSL_CTX is not None:
+        return _SSL_CTX
+    cafile = getattr(config, "CA_BUNDLE_PATH", None)
+    try:
+        if cafile and os.path.exists(cafile):
+            _SSL_CTX = ssl.create_default_context(cafile=cafile)
+        else:
+            _SSL_CTX = ssl.create_default_context()
+    except Exception:
+        _SSL_CTX = ssl.create_default_context()
+    return _SSL_CTX
+
+
+class _Resp:
+    """requests.Response 최소 호환 객체."""
+
+    def __init__(self, status_code, body: bytes, headers=None):
+        self.status_code = status_code
+        self.content = body
+        self.headers = headers or {}
+        self.text = body.decode("utf-8", errors="replace")
+
+    def json(self):
+        return json.loads(self.text)
+
 
 def _get(url, params=None, timeout=20, retries=3):
     last = None
+    if params:
+        sep = "&" if "?" in url else "?"
+        url = url + sep + urllib.parse.urlencode(params)
     for attempt in range(retries):
         try:
-            r = requests.get(url, params=params, headers=SESSION_HEADERS, timeout=timeout)
+            req = urllib.request.Request(url, headers=SESSION_HEADERS)
+            with urllib.request.urlopen(req, timeout=timeout,
+                                        context=_ssl_context()) as fp:
+                body = fp.read()
+                enc = (fp.headers.get("Content-Encoding") or "").lower()
+                if "gzip" in enc:
+                    body = gzip.decompress(body)
+                r = _Resp(getattr(fp, "status", 200), body, dict(fp.headers))
             if r.status_code == 200:
                 return r
             last = Exception(f"HTTP {r.status_code}")

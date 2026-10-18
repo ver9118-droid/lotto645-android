@@ -48,3 +48,7 @@ docker run --rm -v "$PWD":/home/user/hostcwd \
 - 회차 데이터: 동행복권 공식 데이터 + `smok95.github.io/lotto` 미러(자동 동기화)
 - 첫 실행 시 앱에 포함된 `data/draws.json`(1,246회차)으로 즉시 사용 가능, 이후 자동 업데이트
 - 모든 계산은 단말에서 수행하며 개인정보를 전송하지 않습니다.
+- **외부 파이썬 패키지 의존성 없음**: HTTP는 표준 라이브러리(`urllib` + `ssl`)만 사용하고,
+  HTTPS 인증서는 `assets/cacert.pem`(Mozilla CA 번들)으로 검증합니다.
+  (p4a 빌드에서 순수 파이썬 패키지 설치가 실패하는 문제를 제거하고 APK 용량도 줄입니다.)
+- 한글 폰트: `assets/NanumGothic-Regular.ttf` / `-Bold.ttf` (OFL 라이선스)

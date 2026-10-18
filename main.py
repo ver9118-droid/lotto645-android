@@ -768,7 +768,10 @@ class SettingsScreen(BaseScreen):
 class LottoApp(App):
     title = "로또 6/45 지능형 추천"
     last_sets = ListProperty([])
-    settings = ObjectProperty({})
+
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.settings = {}          # 평범한 dict (스레드에서도 안전)
 
     # ---------- 설정 ----------
     def load_settings(self):
@@ -992,15 +995,14 @@ class LottoApp(App):
                 sets = E.generate_sets(draws, n_sets=n_sets, strategy=strategy,
                                        include=include, exclude=exclude,
                                        anti_popular=anti, progress_cb=prog)
-                self._save_sets(sets, strategy)
+                self._save_sets(sets, strategy, n_sets, anti)
                 Clock.schedule_once(lambda *a: self._after_generate(sets))
             except Exception as e:
                 Clock.schedule_once(lambda *a: self._after_generate([], str(e)))
 
         threading.Thread(target=work, daemon=True).start()
 
-    def _save_sets(self, sets, strategy):
-        self.last_sets = sets
+    def _save_sets(self, sets, strategy, n_sets, anti):
         try:
             os.makedirs(os.path.dirname(config.RECOMMENDATIONS_PATH), exist_ok=True)
             with open(config.RECOMMENDATIONS_PATH, "w", encoding="utf-8") as f:
@@ -1010,13 +1012,15 @@ class LottoApp(App):
         except Exception:
             pass
         st = dict(self.settings)
-        st.update({"sets": int(self.rec.sp_sets.text), "strategy": strategy,
-                   "anti_popular": bool(self.rec.sw_anti.active)})
+        st.update({"sets": int(n_sets), "strategy": strategy,
+                   "anti_popular": bool(anti)})
         self.settings = st
         self.save_settings()
 
     def _after_generate(self, sets, err=None):
         self._set_busy(False)
+        if sets:
+            self.last_sets = sets
         self.home.set_progress(1.0, err if err else f"{len(sets)}세트 생성 완료")
         Clock.schedule_once(lambda *a: self.home.set_progress(None), 2.0)
         self.refresh_all()

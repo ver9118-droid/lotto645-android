@@ -10,7 +10,7 @@ source.exclude_patterns = *.pyc, *.md
 
 version = 1.0.0
 
-requirements = python3,kivy,pyjnius,requests,urllib3,certifi,charset-normalizer,idna,openssl
+requirements = python3,kivy,pyjnius,openssl
 
 orientation = portrait
 fullscreen = 0

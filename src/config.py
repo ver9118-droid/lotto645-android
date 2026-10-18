@@ -22,6 +22,10 @@ RECOMMENDATIONS_PATH = os.path.join(DATA_DIR, "recommendations.json")
 SETTINGS_PATH = os.path.join(DATA_DIR, "settings.json")
 LOG_PATH = os.path.join(DATA_DIR, "app.log")
 
+# HTTPS 인증서 검증용 CA 번들 (앱에 포함; Android에는 시스템 CA 저장소가 없음)
+APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CA_BUNDLE_PATH = os.path.join(APP_ROOT, "assets", "cacert.pem")
+
 LOTTO_MIN = 1
 LOTTO_MAX = 45
 NUMBERS_PER_DRAW = 6
