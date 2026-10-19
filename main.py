@@ -1025,6 +1025,10 @@ class LottoApp(App):
         if set(include) & set(exclude):
             self.toast("포함 번호와 제외 번호가 겹칩니다.")
             return
+        if len(include) == 6 and n_sets > 1:
+            # 6개를 모두 고정하면 조합은 1개뿐입니다.
+            n_sets = 1
+            self.rec.sp_sets.text = "1"
         strategy = self.current_strategy()
         anti = bool(self.rec.sw_anti.active)
 

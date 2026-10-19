@@ -10,7 +10,9 @@ source.exclude_patterns = *.pyc, *.md, data/lotto.db, data/settings.json, data/r
 
 version = 1.0.0
 
-requirements = python3,kivy,pyjnius,openssl
+# Kivy 레시피가 requests 의존성을 끌어옵니다. charset-normalizer 3.5.x 는
+# Android 전용 휠을 배포해 p4a 의 pip 설치 단계가 실패하므로 3.4.4 로 고정합니다.
+requirements = python3,kivy,pyjnius,openssl,charset-normalizer==3.4.4
 
 orientation = portrait
 fullscreen = 0
