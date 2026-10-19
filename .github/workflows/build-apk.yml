@@ -42,6 +42,7 @@ jobs:
           docker run --rm \
             -v "$PWD":/home/user/hostcwd \
             -v "$HOME/.buildozer":/home/user/.buildozer \
+            -e PIP_CONSTRAINT=/home/user/hostcwd/constraints.txt \
             ghcr.io/kivy/buildozer:latest android debug
 
       - name: Show result
