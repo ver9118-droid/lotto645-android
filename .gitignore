@@ -1,5 +1,7 @@
 .buildozer/
 bin/
+.venv/
+.venv-test/
 __pycache__/
 *.pyc
 *.pyo

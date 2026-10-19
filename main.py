@@ -39,19 +39,16 @@ from kivy.app import App                                  # noqa: E402
 from kivy.clock import Clock                              # noqa: E402
 from kivy.core.clipboard import Clipboard                 # noqa: E402
 from kivy.core.text import LabelBase, DEFAULT_FONT        # noqa: E402
-from kivy.graphics import Color, RoundedRectangle, Ellipse, Rectangle, Line  # noqa: E402
+from kivy.graphics import Color, RoundedRectangle, Ellipse, Rectangle  # noqa: E402
 from kivy.metrics import dp, sp                           # noqa: E402
-from kivy.properties import (BooleanProperty, ListProperty, NumericProperty,  # noqa: E402
-                             ObjectProperty, StringProperty)
+from kivy.properties import BooleanProperty, ListProperty  # noqa: E402
 from kivy.uix.boxlayout import BoxLayout                  # noqa: E402
 from kivy.uix.button import Button                        # noqa: E402
-from kivy.uix.checkbox import CheckBox                    # noqa: E402
 from kivy.uix.floatlayout import FloatLayout              # noqa: E402
 from kivy.uix.label import Label as _KivyLabel            # noqa: E402
 from kivy.uix.scrollview import ScrollView                # noqa: E402
 from kivy.uix.screenmanager import ScreenManager, Screen, NoTransition  # noqa: E402
 from kivy.uix.spinner import Spinner, SpinnerOption          # noqa: E402
-from kivy.uix.switch import Switch                        # noqa: E402
 from kivy.uix.textinput import TextInput                  # noqa: E402
 from kivy.uix.widget import Widget                        # noqa: E402
 
@@ -108,6 +105,15 @@ def ball_rgba(n):
         if lo <= n <= hi:
             return C(c)
     return C("#AAAAAA")
+
+
+def ball_font(size_px, ratio=0.45):
+    """공 지름(px)에 비례하는 글자 크기(sp 단위).
+
+    font_size 는 sp 단위라서 dp 값을 그대로 넣으면 고해상도 단말에서
+    글자가 공보다 커집니다. px 목표값을 sp 로 환산합니다.
+    """
+    return max(7.0, (size_px * ratio) / (sp(1) or 1.0))
 
 
 def strat_label(name):
@@ -204,7 +210,7 @@ class Ball(FloatLayout):
             Color(*ball_rgba(number))
             self._ell = Ellipse(pos=self.pos, size=self.size)
         self.bind(pos=self._pos, size=self._pos)
-        self.add_widget(Lbl(text=str(number), font_size=s * 0.45, bold=True,
+        self.add_widget(Lbl(text=str(number), font_size=ball_font(s, 0.45), bold=True,
                             color=(1, 1, 1, 1)))
         self._pos()
 
@@ -221,7 +227,7 @@ def ball_row(numbers, bonus=None, size=None, spacing=None):
     for n in numbers:
         row.add_widget(Ball(n, size=s))
     if bonus is not None:
-        row.add_widget(Lbl(text="+", color=PLUS, font_size=s * 0.52,
+        row.add_widget(Lbl(text="+", color=PLUS, font_size=ball_font(s, 0.52),
                              size_hint_x=None, width=dp(14)))
         row.add_widget(Ball(bonus, size=s))
     return row
@@ -626,8 +632,21 @@ class RecScreen(BaseScreen):
         btns.add_widget(b_share)
         self.box.add_widget(btns)
 
+        self.status = Lbl(text="", color=ACCENT, font_size=sp(10),
+                          size_hint_y=None, height=0, halign="left",
+                          text_size=(None, None))
+        self.box.add_widget(self.status)
+
         self._on_strategy()
         self.refresh()
+
+    def set_status(self, msg=None):
+        if msg:
+            self.status.text = msg
+            self.status.height = dp(18)
+        else:
+            self.status.text = ""
+            self.status.height = 0
 
     def _on_strategy(self):
         name = self.app.current_strategy(self.sp_strat.text)
@@ -663,12 +682,18 @@ class AnalysisScreen(BaseScreen):
         self.card_freq.add_widget(self.freq_holder)
 
     @staticmethod
-    def _ball_line(nums, size=None):
-        row = BoxLayout(orientation="horizontal", size_hint_y=None,
-                        height=(size or dp(26)) + dp(4), spacing=dp(4))
-        for n in nums:
-            row.add_widget(Ball(n, size=size or dp(26)))
-        return row
+    def _ball_lines(nums, per_row=8, size=None):
+        """HOT/COLD 15개를 화면 폭에 맞춰 2줄로 배치."""
+        s = size or dp(26)
+        box = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(4))
+        box.bind(minimum_height=box.setter("height"))
+        for i in range(0, len(nums), per_row):
+            row = BoxLayout(orientation="horizontal", size_hint_y=None,
+                            height=s + dp(4), spacing=dp(4))
+            for n in nums[i:i + per_row]:
+                row.add_widget(Ball(n, size=s))
+            box.add_widget(row)
+        return box
 
     def refresh(self):
         draws = storage.get_all_draws()
@@ -686,7 +711,7 @@ class AnalysisScreen(BaseScreen):
             while len(card.children) > 1:
                 card.remove_widget(card.children[0])
             if nums:
-                card.add_widget(self._ball_line(nums))
+                card.add_widget(self._ball_lines(nums))
 
         freq = S.frequency(draws)
         top = max(freq) if freq else 1
@@ -733,6 +758,11 @@ class SettingsScreen(BaseScreen):
         card.add_widget(btn)
         self.box.add_widget(card)
 
+        self.status = Lbl(text="", color=ACCENT, font_size=sp(10),
+                          size_hint_y=None, height=0, halign="left",
+                          text_size=(None, None))
+        self.box.add_widget(self.status)
+
         card2 = self.section("데이터")
         self.l_info = Lbl(text="", color=MUTED, font_size=sp(11),
                             size_hint_y=None, height=dp(46), halign="left",
@@ -754,10 +784,17 @@ class SettingsScreen(BaseScreen):
             halign="left", valign="top", text_size=(None, None))
         card3.add_widget(self.l_about)
 
+    def set_status(self, msg=None):
+        if msg:
+            self.status.text = msg
+            self.status.height = dp(18)
+        else:
+            self.status.text = ""
+            self.status.height = 0
+
     def refresh(self):
         latest = storage.get_latest_round()
         cnt = storage.count_draws()
-        s = self.app.settings
         self.l_info.text = (f"보유 회차: {cnt}회  |  최신: {latest}회\n"
                             f"데이터 폴더: {config.DATA_DIR}")
 
@@ -803,6 +840,7 @@ class LottoApp(App):
         if os.environ.get("ANDROID_PRIVATE"):
             from kivy.core.window import Window
             Window.softinput_mode = "below_target"
+            Window.bind(on_keyboard=self._on_android_back)
 
         root = BoxLayout(orientation="vertical")
         head = BoxLayout(orientation="horizontal", size_hint_y=None,
@@ -896,7 +934,7 @@ class LottoApp(App):
         for tok in (text or "").replace(" ", "").split(","):
             if tok:
                 n = int(tok)
-                if 1 <= n <= 45:
+                if 1 <= n <= 45 and n not in out:
                     out.append(n)
         return out
 
@@ -942,7 +980,9 @@ class LottoApp(App):
     def _after_update(self, msg):
         self._set_busy(False)
         self.home.set_progress(1.0, msg)
-        Clock.schedule_once(lambda *a: self.home.set_progress(None), 2.0)
+        self.settings_screen.set_status(msg)
+        Clock.schedule_once(lambda *a: (self.home.set_progress(None),
+                                        self.settings_screen.set_status(None)), 2.5)
         self.refresh_all()
 
     def reseed(self):
@@ -970,16 +1010,20 @@ class LottoApp(App):
             return
         draws = storage.get_all_draws()
         if not draws:
-            self.home.set_progress(1.0, "데이터가 없습니다. 먼저 업데이트하세요.")
-            Clock.schedule_once(lambda *a: self.home.set_progress(None), 2.5)
+            self.toast("데이터가 없습니다. 먼저 업데이트하세요.")
             return
         try:
             n_sets = int(self.rec.sp_sets.text)
             include = self._parse_nums(self.rec.ti_inc.text)
             exclude = self._parse_nums(self.rec.ti_exc.text)
         except ValueError:
-            self.home.set_progress(1.0, "입력 오류: 숫자를 쉼표로 구분해 입력하세요.")
-            Clock.schedule_once(lambda *a: self.home.set_progress(None), 2.5)
+            self.toast("입력 오류: 숫자를 쉼표로 구분해 입력하세요.")
+            return
+        if len(include) > 6:
+            self.toast("포함 번호는 최대 6개까지 입력할 수 있습니다.")
+            return
+        if set(include) & set(exclude):
+            self.toast("포함 번호와 제외 번호가 겹칩니다.")
             return
         strategy = self.current_strategy()
         anti = bool(self.rec.sw_anti.active)
@@ -995,8 +1039,10 @@ class LottoApp(App):
                 sets = E.generate_sets(draws, n_sets=n_sets, strategy=strategy,
                                        include=include, exclude=exclude,
                                        anti_popular=anti, progress_cb=prog)
-                self._save_sets(sets, strategy, n_sets, anti)
-                Clock.schedule_once(lambda *a: self._after_generate(sets))
+                if sets:
+                    self._save_sets(sets, strategy, n_sets, anti)
+                msg = None if sets else "조건에 맞는 조합이 없습니다. 포함/제외 번호를 조정해 주세요."
+                Clock.schedule_once(lambda *a: self._after_generate(sets, msg))
             except Exception as e:
                 Clock.schedule_once(lambda *a: self._after_generate([], str(e)))
 
@@ -1021,8 +1067,11 @@ class LottoApp(App):
         self._set_busy(False)
         if sets:
             self.last_sets = sets
-        self.home.set_progress(1.0, err if err else f"{len(sets)}세트 생성 완료")
-        Clock.schedule_once(lambda *a: self.home.set_progress(None), 2.0)
+        msg = err if err else f"{len(sets)}세트 생성 완료"
+        self.home.set_progress(1.0, msg)
+        self.rec.set_status(msg)
+        Clock.schedule_once(lambda *a: (self.home.set_progress(None),
+                                        self.rec.set_status(None)), 2.5)
         self.refresh_all()
         if sets:
             self.goto("home")
@@ -1072,7 +1121,13 @@ class LottoApp(App):
 
     def toast(self, msg):
         self.home.set_progress(1.0, msg)
-        Clock.schedule_once(lambda *a: self.home.set_progress(None), 2.2)
+        self.rec.set_status(msg)
+
+        def clear(*a):
+            self.home.set_progress(None)
+            self.rec.set_status(None)
+
+        Clock.schedule_once(clear, 2.2)
 
     def on_auto_change(self):
         st = dict(self.settings)
@@ -1088,6 +1143,13 @@ class LottoApp(App):
             self.updater.start_background(float(st["interval_hours"]))
 
     # ---------- 공통 ----------
+    def _on_android_back(self, window, key, scancode, codepoint, modifier):
+        """안드로이드 뒤로가기: 다른 탭이면 홈으로, 홈이면 앱 종료."""
+        if key == 27 and self.sm.current != "home":
+            self.goto("home")
+            return True
+        return False
+
     def goto(self, key):
         self.sm.current = key
         for k, b in self.nav_btns.items():

@@ -4,9 +4,9 @@ package.name = lotto645
 package.domain = org.lotto
 
 source.dir = .
-source.include_exts = py,png,jpg,jpeg,kv,atlas,ttf,json,db,txt,ico
-source.exclude_dirs = .buildozer, bin, .git, .github, __pycache__, tests
-source.exclude_patterns = *.pyc, *.md
+source.include_exts = py,png,jpg,jpeg,kv,atlas,ttf,json,db,txt,ico,pem
+source.exclude_dirs = .buildozer, bin, .git, .github, __pycache__, tests, .venv, .venv-test, .kivy
+source.exclude_patterns = *.pyc, *.md, data/lotto.db, data/settings.json, data/recommendations.json
 
 version = 1.0.0
 
