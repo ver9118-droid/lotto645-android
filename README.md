@@ -51,6 +51,8 @@ docker run --rm -v "$PWD":/home/user/hostcwd \
 
 ## APK 크기 최적화
 
+디버그 APK 기준 **22.31 MB → 16.72 MB** (약 25% 감소) 했습니다.
+
 - **불필요한 파이썬 패키지 제거** — `p4a-recipes/kivy` 가 Kivy 기본
   `python_depends`(requests, chardet, idna, urllib3)를 설치하지 않습니다.
   이 앱은 HTTP 를 표준 라이브러리로 처리하고 `kivy.network.urlrequest` 를 쓰지 않습니다.
@@ -60,8 +62,10 @@ docker run --rm -v "$PWD":/home/user/hostcwd \
   Python 3.14 번들에는 `pkg_resources` 가 없고 pyjnius 도 3.9+ 에서는 `importlib.resources` 를 씁니다.
 - **표준 라이브러리 정리** — `p4a-recipes/python3` 가 `stdlib_dir_blacklist` 를 확장해
   이 앱이 쓰지 않는 모듈(asyncio, unittest, multiprocessing, xml, pydoc_data 등)을 번들에서 뺍니다.
-- **Kivy 내장 폰트 제거** — `site_packages_dir_blacklist` 로 `kivy/data/fonts`
-  (Roboto/DejaVu, 약 1.4MB)를 제외합니다. 기본 폰트는 NanumGothic 으로 교체되어 있습니다.
+- **Kivy 내장 폰트/도구 정리** — `kivy/tools` 와 쓰지 않는 폰트(DejaVuSans, RobotoMono)를
+  번들에서 제외합니다. Roboto 4종은 `kivy/core/text` 가 import 시점에 기본 폰트로
+  등록하므로 반드시 남겨야 합니다(없으면 앱이 시작되지 않습니다).
+  실제 UI 폰트는 서브셋한 NanumGothic 을 씁니다.
 - **한글 폰트 서브셋** — `tools/subset_fonts.py` 가 UI 코드에 등장하는 글자만 남깁니다.
   전체 폰트는 `font_src/` 에 보관하고 APK 에는 넣지 않습니다(약 4MB → 0.35MB).
   문구를 바꾼 뒤에는 스크립트를 다시 실행하세요.
