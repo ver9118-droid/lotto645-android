@@ -40,8 +40,14 @@
 ```bash
 docker run --rm -v "$PWD":/home/user/hostcwd \
   -v "$HOME/.buildozer":/home/user/.buildozer \
+  -e PIP_CONSTRAINT=/home/user/hostcwd/constraints.txt \
   ghcr.io/kivy/buildozer:latest android debug
 ```
+
+`-e PIP_CONSTRAINT=...` 는 필수입니다. p4a 는 Kivy 레시피의 `requests` 의존성을
+해석하면서 `charset-normalizer` 의 최신 버전을 고르는데, 3.5.x 는 Android 전용 휠만
+배포해 이어지는 호스트 pip 설치가 실패합니다(`not a supported wheel on this platform`).
+`constraints.txt` 로 순수 휠(`py3-none-any`)이 있는 3.4.4 를 강제합니다.
 
 ## 데이터
 
