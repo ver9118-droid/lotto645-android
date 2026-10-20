@@ -24,6 +24,11 @@ _spec.loader.exec_module(_builtin)
 
 
 class KivyRecipe(_builtin.KivyRecipe):
+    # setuptools 는 Kivy 빌드에만 쓰이고 런타임에는 필요 없습니다.
+    # (Python 3.14 번들에는 pkg_resources 가 없고,
+    #  pyjnius 도 3.9+ 에서는 importlib.resources 를 사용합니다.)
+    depends = [('sdl2', 'sdl3'), 'pyjnius', 'android']
+
     # filetype: kivy/core/image 에서 필수
     # certifi  : Android 에서 원격 이미지 로딩(loader.py) 시 사용
     # requests/chardet/idna/urllib3 는 이 앱에서 쓰지 않으므로 제외

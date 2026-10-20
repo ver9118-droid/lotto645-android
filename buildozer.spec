@@ -6,7 +6,7 @@ package.domain = org.lotto
 source.dir = .
 source.include_exts = py,png,jpg,jpeg,kv,atlas,ttf,json,db,txt,ico,pem
 source.exclude_dirs = .buildozer, bin, .git, .github, __pycache__, tests, .venv, .venv-test, .kivy, font_src, tools, p4a-recipes
-source.exclude_patterns = *.pyc, *.md, data/lotto.db, data/settings.json, data/recommendations.json, constraints.txt, icon*.png, presplash.png
+source.exclude_patterns = *.pyc, *.md, data/lotto.db, data/settings.json, data/recommendations.json, constraints.txt, assets/icon*.png, assets/presplash.png
 
 version = 1.0.0
 

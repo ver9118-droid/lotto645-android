@@ -56,6 +56,8 @@ docker run --rm -v "$PWD":/home/user/hostcwd \
   이 앱은 HTTP 를 표준 라이브러리로 처리하고 `kivy.network.urlrequest` 를 쓰지 않습니다.
   (`filetype` 은 `kivy/core/image` 가 시작 시 import 하므로 유지, `certifi` 는
   Android 원격 이미지 로딩 경로용으로 유지)
+- **setuptools 제거** — 빌드에만 필요하고 런타임에는 쓰이지 않아 `depends` 에서 뺍니다.
+  Python 3.14 번들에는 `pkg_resources` 가 없고 pyjnius 도 3.9+ 에서는 `importlib.resources` 를 씁니다.
 - **한글 폰트 서브셋** — `tools/subset_fonts.py` 가 UI 코드에 등장하는 글자만 남깁니다.
   전체 폰트는 `font_src/` 에 보관하고 APK 에는 넣지 않습니다(약 4MB → 0.35MB).
   문구를 바꾼 뒤에는 스크립트를 다시 실행하세요.
