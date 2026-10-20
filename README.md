@@ -49,6 +49,17 @@ docker run --rm -v "$PWD":/home/user/hostcwd \
 실패할 수 있습니다(`not a supported wheel on this platform`). `constraints.txt` 로
 순수 휠(`py3-none-any`)이 있는 3.4.4 를 강제해 둡니다.
 
+## 화면 수정 이력 (휴대폰 실기기 기준)
+
+- **공 숫자 표시** — `Label.font_size` 는 픽셀 단위인데 `sp(1)` 로 나눠서 값을 넘기고 있었습니다.
+  데스크톱(density 1)에서는 우연히 맞았지만 휴대폰(density 3)에서는 공의 15% 크기로 그려져
+  보이지 않았습니다. 픽셀 단위로 계산하도록 고치고, 숫자는 자식 Label 이 아니라 캔버스에
+  직접 렌더하도록 바꿨습니다(ScrollView 안에서 텍스트가 그려지지 않던 문제도 함께 해결).
+- **스크롤바 겹침** — Kivy 의 `ScrollView` 세로 스크롤바가 내용 위에 겹쳐 그려져
+  분석 화면의 오른쪽 값 열을 가렸습니다. 스크롤바 폭을 줄이고 콘텐츠 여백을 두었습니다.
+- **크래시 진단** — 시작 중 예외가 나면 앱이 죽지 않고 **화면에 traceback** 을 보여주고,
+  `crash.log` 로 저장합니다(`/sdcard/Android/data/org.lotto.lotto645/files/crash.log`).
+
 ## APK 크기 최적화
 
 디버그 APK 기준 **22.31 MB → 15.88 MB** (약 29% 감소) 했습니다.
