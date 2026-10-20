@@ -44,10 +44,24 @@ docker run --rm -v "$PWD":/home/user/hostcwd \
   ghcr.io/kivy/buildozer:latest android debug
 ```
 
-`-e PIP_CONSTRAINT=...` 는 필수입니다. p4a 는 Kivy 레시피의 `requests` 의존성을
-해석하면서 `charset-normalizer` 의 최신 버전을 고르는데, 3.5.x 는 Android 전용 휠만
-배포해 이어지는 호스트 pip 설치가 실패합니다(`not a supported wheel on this platform`).
-`constraints.txt` 로 순수 휠(`py3-none-any`)이 있는 3.4.4 를 강제합니다.
+`-e PIP_CONSTRAINT=...` 는 안전장치입니다. p4a 가 (다른 경로로) `requests` 를 다시
+끌어오면 `charset-normalizer` 최신 버전의 Android 전용 휠을 골라 호스트 pip 설치가
+실패할 수 있습니다(`not a supported wheel on this platform`). `constraints.txt` 로
+순수 휠(`py3-none-any`)이 있는 3.4.4 를 강제해 둡니다.
+
+## APK 크기 최적화
+
+- **불필요한 파이썬 패키지 제거** — `p4a-recipes/kivy` 가 Kivy 기본
+  `python_depends`(requests, chardet, idna, urllib3)를 설치하지 않습니다.
+  이 앱은 HTTP 를 표준 라이브러리로 처리하고 `kivy.network.urlrequest` 를 쓰지 않습니다.
+  (`filetype` 은 `kivy/core/image` 가 시작 시 import 하므로 유지, `certifi` 는
+  Android 원격 이미지 로딩 경로용으로 유지)
+- **한글 폰트 서브셋** — `tools/subset_fonts.py` 가 UI 코드에 등장하는 글자만 남깁니다.
+  전체 폰트는 `font_src/` 에 보관하고 APK 에는 넣지 않습니다(약 4MB → 0.35MB).
+  문구를 바꾼 뒤에는 스크립트를 다시 실행하세요.
+- **적응형 아이콘** — `tools/make_adaptive_icon.py` 로 `assets/icon_fg.png`(전경),
+  `assets/icon_bg.png`(배경)를 생성합니다. Android 8.0+ 런처에서 잘리지 않고 표시됩니다.
+- 아이콘/스플래시 원본은 빌드 설정에서만 쓰고 앱 런타임 자산에서는 제외합니다.
 
 ## 데이터
 
@@ -57,4 +71,4 @@ docker run --rm -v "$PWD":/home/user/hostcwd \
 - **외부 파이썬 패키지 의존성 없음**: HTTP는 표준 라이브러리(`urllib` + `ssl`)만 사용하고,
   HTTPS 인증서는 `assets/cacert.pem`(Mozilla CA 번들)으로 검증합니다.
   (p4a 빌드에서 순수 파이썬 패키지 설치가 실패하는 문제를 제거하고 APK 용량도 줄입니다.)
-- 한글 폰트: `assets/NanumGothic-Regular.ttf` / `-Bold.ttf` (OFL 라이선스)
+- 한글 폰트: `assets/NanumGothic-Regular.ttf` / `-Bold.ttf` (OFL 라이선스, UI 글자만 서브셋)

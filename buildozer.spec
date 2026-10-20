@@ -5,22 +5,25 @@ package.domain = org.lotto
 
 source.dir = .
 source.include_exts = py,png,jpg,jpeg,kv,atlas,ttf,json,db,txt,ico,pem
-source.exclude_dirs = .buildozer, bin, .git, .github, __pycache__, tests, .venv, .venv-test, .kivy
-source.exclude_patterns = *.pyc, *.md, data/lotto.db, data/settings.json, data/recommendations.json, constraints.txt
+source.exclude_dirs = .buildozer, bin, .git, .github, __pycache__, tests, .venv, .venv-test, .kivy, font_src, tools, p4a-recipes
+source.exclude_patterns = *.pyc, *.md, data/lotto.db, data/settings.json, data/recommendations.json, constraints.txt, icon*.png, presplash.png
 
 version = 1.0.0
 
-# Kivy 레시피가 requests 의존성을 끌어옵니다. charset-normalizer 3.5.x 는
-# Android 전용 휠을 배포해 p4a 의 pip 설치 단계가 실패하므로 3.4.4 로 고정합니다.
-# (실제 고정은 constraints.txt + PIP_CONSTRAINT 로 적용됩니다. p4a 는 여기 적힌
-#  버전 표기를 모듈 해석 단계에서 제거하기 때문입니다.)
-requirements = python3,kivy,pyjnius,openssl,charset-normalizer==3.4.4
+# Kivy 기본 의존성 중 requests 계열은 p4a-recipes/kivy 에서 제외했습니다.
+requirements = python3,kivy,pyjnius,openssl
+
+# Kivy 레시피 덮어쓰기(불필요한 pip 의존성 제거) 위치
+p4a.local_recipes = %(source.dir)s/p4a-recipes
 
 orientation = portrait
 fullscreen = 0
 android.allow_backup = True
 
 icon.filename = %(source.dir)s/assets/icon.png
+# Android 8.0+ 적응형 아이콘(런처가 모양을 잘라내므로 전경/배경을 따로 줍니다)
+icon.adaptive_foreground.filename = %(source.dir)s/assets/icon_fg.png
+icon.adaptive_background.filename = %(source.dir)s/assets/icon_bg.png
 presplash.filename = %(source.dir)s/assets/presplash.png
 android.presplash_color = #12161d
 
