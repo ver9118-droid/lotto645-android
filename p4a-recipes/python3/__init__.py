@@ -50,45 +50,15 @@ EXTRA_STDLIB_BLACKLIST = {
 
 
 # 번들에서 제외할 C 확장 모듈
-#   - CPython 테스트 전용 모듈 (test 패키지는 이미 제외됨)
-#   - 서브 인터프리터/원격 디버깅/프로파일링 등 사용하지 않는 기능
-#   - 표준 라이브러리에서 이미 제외한 모듈의 C 확장 (_asyncio, pyexpat 등)
-#   - decimal : Lib/decimal.py 에 _pydecimal 폴백이 있어 안전함
-#   - CJK 코덱: cp949(한국어)는 _codecs_kr 를 쓰므로 유지, 일본/중국/대만만 제외
-EXCLUDED_C_MODULES = {
-    # 테스트 전용
-    "_ctypes_test",
-    "_testbuffer",
-    "_testcapi",
-    "_testclinic",
-    "_testclinic_limited",
-    "_testimportmultiple",
-    "_testinternalcapi",
-    "_testlimitedcapi",
-    "_testmultiphase",
-    "_testsinglephase",
-    "_xxtestfuzz",
-    "xxlimited",
-    "xxlimited_35",
-    "xxsubtype",
-    # 사용하지 않는 기능
-    "_interpchannels",
-    "_interpreters",
-    "_interpqueues",
-    "_lsprof",
-    "_remote_debugging",
-    # 표준 라이브러리에서 제외한 모듈의 C 확장
-    "_asyncio",
-    "_elementtree",
-    "pyexpat",
-    # 순수 파이썬 폴백이 있는 모듈
-    "_decimal",
-    # 일본/중국/대만 코덱 (한국어 cp949 는 유지)
-    "_codecs_cn",
-    "_codecs_hk",
-    "_codecs_jp",
-    "_codecs_tw",
-}
+#   (현재 비활성화)
+#   Android 런타임에서 어떤 모듈이 interpreter 가 필요로 하는지 확정하기 어려워
+#   C 확장 모듈은 남겨둔다. 제외했던 목록:
+#     - CPython 테스트 전용 모듈 (_testcapi 등)
+#     - 서브 인터프리터/원격 디버깅/프로파일링 기능
+#     - _asyncio, pyexpat, _elementtree (표준 라이브러리에서 이미 제외)
+#     - _decimal (Lib/decimal.py 에 _pydecimal 폴백이 있어 안전함)
+#     - 일본/중국/대만 CJK 코덱 (cp949 는 _codecs_kr 로 유지)
+EXCLUDED_C_MODULES: set[str] = set()
 
 
 class Python3Recipe(_builtin.Python3Recipe):
@@ -99,7 +69,8 @@ class Python3Recipe(_builtin.Python3Recipe):
     def create_python_bundle(self, dirn, arch):
         # 원본이 site-packages 경로를 반환하므로 그대로 돌려줘야 합니다.
         site_packages = super().create_python_bundle(dirn, arch)
-        self._drop_c_modules(dirn)
+        if EXCLUDED_C_MODULES:
+            self._drop_c_modules(dirn)
         return site_packages
 
     def _drop_c_modules(self, dirn):

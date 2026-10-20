@@ -20,6 +20,59 @@ if "ANDROID_PRIVATE" in os.environ:                       # p4a 가 설정
     os.environ.setdefault("LOTTO_DATA_DIR", os.environ["ANDROID_PRIVATE"])
 sys.path.insert(0, _HERE)
 
+# ---------------------------------------------------------------------------
+# 크래시 리포터
+#   예외로 앱이 조용히 종료되면 원인을 알 수 없으므로, 로그를 파일로 남기고
+#   (외부 저장소에도 저장) 가능한 경우 화면에 오류를 표시한다.
+# ---------------------------------------------------------------------------
+import traceback
+
+_APP_PKG = "org.lotto.lotto645"
+
+
+def _crash_log_paths():
+    paths = []
+    data_dir = os.environ.get("LOTTO_DATA_DIR")
+    if data_dir:
+        paths.append(os.path.join(data_dir, "crash.log"))
+    ext = os.environ.get("ANDROID_EXTERNAL_STORAGE") or "/sdcard"
+    paths.append(os.path.join(ext, "Android", "data", _APP_PKG, "files", "crash.log"))
+    return paths
+
+
+def save_crash_log(text):
+    """크래시 로그를 여러 위치에 저장합니다 (실패해도 앱은 계속 동작)."""
+    for path in _crash_log_paths():
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(text)
+        except Exception:
+            pass
+
+
+def install_crash_hook():
+    """처리되지 않은 예외를 로그로 남깁니다 (logcat 에도 출력)."""
+    previous = sys.excepthook
+
+    def hook(exc_type, exc, tb):
+        text = "".join(traceback.format_exception(exc_type, exc, tb))
+        save_crash_log(text)
+        try:
+            sys.stderr.write(text)
+            sys.stderr.flush()
+        except Exception:
+            pass
+        try:
+            previous(exc_type, exc, tb)
+        except Exception:
+            pass
+
+    sys.excepthook = hook
+
+
+install_crash_hook()
+
 from src import config                                    # noqa: E402
 from src.data import storage                              # noqa: E402
 from src.analysis import stats as S                       # noqa: E402
@@ -113,6 +166,31 @@ def ball_rgba(n):
         if lo <= n <= hi:
             return C(c)
     return C("#AAAAAA")
+
+
+def build_error_screen(text):
+    """시작 중 예외가 났을 때 대신 보여줄 오류 화면."""
+    box = BoxLayout(orientation="vertical", padding=dp(12), spacing=dp(8))
+    with box.canvas.before:
+        Color(*PAGE)
+        bg = Rectangle(pos=box.pos, size=box.size)
+    box.bind(pos=lambda *a: setattr(bg, "pos", box.pos),
+             size=lambda *a: setattr(bg, "size", box.size))
+
+    box.add_widget(Lbl(text="앱을 시작하는 중 오류가 발생했습니다",
+                       color=RED, bold=True, font_size=sp(13),
+                       halign="left", valign="middle", text_size=(None, None)))
+    box.add_widget(Lbl(text="자세한 내용은 crash.log 파일에 저장했습니다.",
+                       color=MUTED, font_size=sp(10),
+                       halign="left", valign="middle", text_size=(None, None)))
+
+    scroll = ScrollView(do_scroll_x=False)
+    detail = _KivyLabel(text=text, color=FG, font_size=sp(9), halign="left",
+                        valign="top", text_size=(dp(320), None), size_hint_y=None)
+    detail.bind(texture_size=lambda inst, val: setattr(inst, "height", val[1]))
+    scroll.add_widget(detail)
+    box.add_widget(scroll)
+    return box
 
 
 def ball_font(size_px, ratio=0.45):
@@ -836,6 +914,15 @@ class LottoApp(App):
 
     # ---------- 화면 ----------
     def build(self):
+        try:
+            return self._build_ui()
+        except Exception:
+            text = traceback.format_exc()
+            save_crash_log(text)
+            print(text)
+            return build_error_screen(text)
+
+    def _build_ui(self):
         self.settings = self.load_settings()
         storage.init_db()
         self._seed_bundled()
