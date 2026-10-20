@@ -62,6 +62,11 @@ docker run --rm -v "$PWD":/home/user/hostcwd \
   Python 3.14 번들에는 `pkg_resources` 가 없고 pyjnius 도 3.9+ 에서는 `importlib.resources` 를 씁니다.
 - **표준 라이브러리 정리** — `p4a-recipes/python3` 가 `stdlib_dir_blacklist` 를 확장해
   이 앱이 쓰지 않는 모듈(asyncio, unittest, multiprocessing, xml, pydoc_data 등)을 번들에서 뺍니다.
+- **불필요한 C 확장 모듈 제거** — 같은 레시피가 번들에 들어가는 C 모듈 중
+  테스트 전용(_testcapi 등), 서브 인터프리터/디버깅 도구, 이미 제외한 표준 라이브러리의
+  확장(_asyncio, pyexpat, _elementtree), CJK 코덱(일본/중국/대만) 등을 뺍니다.
+  `decimal` 은 `Lib/decimal.py` 의 순수 파이썬 폴백(`_pydecimal`)이 있어 안전하고,
+  cp949(한국어)를 쓰는 `_codecs_kr` 과 `unicodedata` 는 남깁니다.
 - **Kivy 내장 폰트/도구 정리** — `kivy/tools` 와 쓰지 않는 폰트(DejaVuSans, RobotoMono)를
   번들에서 제외합니다. Roboto 4종은 `kivy/core/text` 가 import 시점에 기본 폰트로
   등록하므로 반드시 남겨야 합니다(없으면 앱이 시작되지 않습니다).

@@ -59,6 +59,14 @@ if os.path.exists(FONT_R):
     LabelBase.register(DEFAULT_FONT, fn_regular=FONT_R,
                        fn_bold=FONT_B if os.path.exists(FONT_B) else FONT_R)
 
+# Kivy 선택 모듈 정리
+#  - touchring : 터치 지점에 원이 그려지는 디버그용 모듈 (기본 활성화)
+#  - monitor   : 화면 상단에 FPS/CPU 막대가 나오는 모니터 모듈
+# kivy.modules 를 먼저 import 한 뒤 설정을 지워야 기본값이 다시 생기지 않습니다.
+import kivy.modules                                           # noqa: E402,F401
+for _mod in ("touchring", "monitor"):
+    Config.remove_option("modules", _mod)
+
 
 # ---------------------------------------------------------------------------
 # 색상 (데스크톱 '다크' 테마와 동일)
