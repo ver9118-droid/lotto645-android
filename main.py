@@ -90,7 +90,13 @@ if os.environ.get("KIVY_WINDOW", "") == "" and "ANDROID_PRIVATE" not in os.envir
 
 from kivy.app import App                                  # noqa: E402
 from kivy.clock import Clock                              # noqa: E402
-from kivy.core.clipboard import Clipboard                 # noqa: E402
+try:
+    # Android 는 clipboard provider 를 import 하는 시점에 JNI 를 직접 호출하므로
+    # 실패할 수 있습니다. 공유 기능만 영향을 받으므로 선택적으로 처리합니다.
+    from kivy.core.clipboard import Clipboard             # noqa: E402
+except Exception as _clip_err:                            # noqa: E402
+    print("[clipboard] unavailable:", _clip_err)
+    Clipboard = None
 from kivy.core.text import LabelBase, DEFAULT_FONT        # noqa: E402
 from kivy.graphics import Color, RoundedRectangle, Ellipse, Rectangle  # noqa: E402
 from kivy.metrics import dp, sp                           # noqa: E402
@@ -194,12 +200,13 @@ def build_error_screen(text):
 
 
 def ball_font(size_px, ratio=0.45):
-    """공 지름(px)에 비례하는 글자 크기(sp 단위).
+    """공 지름(px)에 비례하는 글자 크기(px).
 
-    font_size 는 sp 단위라서 dp 값을 그대로 넣으면 고해상도 단말에서
-    글자가 공보다 커집니다. px 목표값을 sp 로 환산합니다.
+    Kivy 의 Label.font_size 는 픽셀 단위입니다(sp() 로 감싸면 값이 3배로
+    커집니다). 공 크기도 dp(반지름) 기반이므로, 여기서는 px 비율을 그대로
+    반환해야 어떤 해상도에서도 공의 45% 크기로 그려집니다.
     """
-    return max(7.0, (size_px * ratio) / (sp(1) or 1.0))
+    return max(7.0, size_px * ratio)
 
 
 def strat_label(name):
@@ -295,14 +302,27 @@ class Ball(FloatLayout):
         with self.canvas.before:
             Color(*ball_rgba(number))
             self._ell = Ellipse(pos=self.pos, size=self.size)
+
+        # 숫자는 캔버스에 직접 그린다.
+        # 자식 Label 로 두면 ScrollView 안에서 텍스트가 그려지지 않는
+        # 문제가 있어(고해상도 단말에서 특히 심함) 렌더 텍스처를 직접 쓴다.
+        from kivy.core.text import Label as CoreLabel
+        self._num = CoreLabel(text=str(number), font_size=ball_font(s, 0.45),
+                              bold=True, color=(1, 1, 1, 1),
+                              text_size=(s, s), halign="center", valign="center")
+        self._num.refresh()
+        with self.canvas.after:
+            Color(1, 1, 1, 1)
+            self._tex = Rectangle(texture=self._num.texture,
+                                  pos=self.pos, size=(s, s))
         self.bind(pos=self._pos, size=self._pos)
-        self.add_widget(Lbl(text=str(number), font_size=ball_font(s, 0.45), bold=True,
-                            color=(1, 1, 1, 1)))
         self._pos()
 
     def _pos(self, *a):
         self._ell.pos = self.pos
         self._ell.size = self.size
+        self._tex.pos = self.pos
+        self._tex.size = self.size
 
 
 def ball_row(numbers, bonus=None, size=None, spacing=None):
@@ -379,12 +399,14 @@ class BarRow(BoxLayout):
         super().__init__(**kw)
         self.ratio = max(0.0, min(1.0, ratio))
         self._color = color
+        # 좌/우 컬럼은 비율로 잡는다(고정 px 폭을 쓰면 좁은 화면에서
+        # 막대가 오른쪽 값 영역까지 넘어가 겹쳐 보인다)
         self.add_widget(Lbl(text=str(label), color=FG, font_size=sp(11),
-                            size_hint_x=None, width=dp(58), halign="center"))
-        self.track = Widget()
+                            size_hint_x=0.14, halign="center"))
+        self.track = Widget(size_hint_x=0.72)
         self.add_widget(self.track)
         self.add_widget(Lbl(text=str(value), color=MUTED, font_size=sp(10.5),
-                            size_hint_x=None, width=dp(46), halign="right"))
+                            size_hint_x=0.14, halign="right"))
         with self.track.canvas.before:
             Color(*LINE)
             self._t = RoundedRectangle(radius=[dp(4)])
@@ -510,9 +532,11 @@ class BaseScreen(Screen):
         super().__init__(**kw)
         self.app = app
         root = BoxLayout(orientation="vertical", padding=dp(6), spacing=dp(6))
-        sv = ScrollView(do_scroll_x=False)
+        # 세로 스크롤바가 내용(오른쪽 값 열 등) 위에 겹쳐 그려지지 않도록
+        # 스크롤바 폭을 줄이고 내용 쪽에 여백을 둔다.
+        sv = ScrollView(do_scroll_x=False, bar_width=dp(3))
         self.box = BoxLayout(orientation="vertical", size_hint_y=None,
-                             spacing=dp(8), padding=(0, dp(2)))
+                             spacing=dp(8), padding=(0, dp(2), dp(6), dp(2)))
         self.box.bind(minimum_height=self.box.setter("height"))
         sv.add_widget(self.box)
         root.add_widget(sv)
