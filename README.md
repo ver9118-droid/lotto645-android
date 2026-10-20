@@ -60,15 +60,22 @@ docker run --rm -v "$PWD":/home/user/hostcwd \
 - **크래시 진단** — 시작 중 예외가 나면 앱이 죽지 않고 **화면에 traceback** 을 보여주고,
   `crash.log` 로 저장합니다(`/sdcard/Android/data/org.lotto.lotto645/files/crash.log`).
 
+> **주의**: `asyncio` 와 `concurrent` 표준 라이브러리는 **절대로 번들에서 제외하면 안 됩니다.**
+> `kivy/clock.py` 가 모듈 import 시점에 `Clock` 인스턴스를 만들고, 그 생성자가
+> `init_async_lib()` → `import asyncio` 를 **무조건** 실행합니다.
+> 없으면 `import kivy` 단계에서 `ImportError` 가 나 앱이 바로 죽습니다
+> (Presplash 만 잠깐 보이다 사라지는 증상). 선택 기능이 아닙니다.
+>
+> 참고로 `kivy.clock` 의 `init_async_lib` 는 Kivy 의 선택적 async API 를 위한
+> 코드처럼 보이지만, `Clock` 생성자에서 기본값으로 호출되므로 사실상 필수입니다.
+
 ## APK 크기 최적화
 
-디버그 APK 기준 **22.31 MB → 19.58 MB** (약 12% 감소) 했습니다.
+디버그 APK 기준 **22.31 MB → 약 16.5 MB** (약 26% 감소) 했습니다.
 
-> **현재 상태**: 실기기에서 동작이 확인된 구성만 적용되어 있습니다(requests 계열 제거,
-> 폰트 서브셋, 적응형 아이콘, 런타임 자산 정리).
-> setuptools / Kivy 내장 폰트·툴 / 표준 라이브러리 12종 / C 확장 모듈 제거는
-> **휴대폰에서 크래시가 확인되어 잠시 되돌려 둔 상태**입니다.
-> 크래시 원인이 특정되면 하나씩 다시 적용해 약 16.7 MB 까지 줄일 수 있습니다.
+> **현재 상태**: 실기기에서 동작이 확인된 최적화만 적용되어 있습니다.
+> (requests 계열 제거, 폰트 서브셋, 적응형 아이콘, setuptools 제거,
+>  Kivy 내장 도구·미사용 폰트 제거, 표준 라이브러리 9종 제외, 불필요한 C 확장 22개 제외)
 
 - **불필요한 파이썬 패키지 제거** — `p4a-recipes/kivy` 가 Kivy 기본
   `python_depends`(requests, chardet, idna, urllib3)를 설치하지 않습니다.
