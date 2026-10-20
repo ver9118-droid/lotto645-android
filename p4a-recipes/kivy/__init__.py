@@ -11,7 +11,6 @@ python-for-android 기본 레시피를 그대로 재사용합니다.
 """
 import importlib.util
 import os
-import shutil
 
 import pythonforandroid
 
@@ -25,11 +24,6 @@ _spec.loader.exec_module(_builtin)
 
 
 class KivyRecipe(_builtin.KivyRecipe):
-    # setuptools 는 Kivy 빌드에만 쓰이고 런타임에는 필요 없습니다.
-    # (Python 3.14 번들에는 pkg_resources 가 없고,
-    #  pyjnius 도 3.9+ 에서는 importlib.resources 를 사용합니다.)
-    depends = [('sdl2', 'sdl3'), 'pyjnius', 'android']
-
     # filetype: kivy/core/image 에서 필수
     # certifi  : Android 에서 원격 이미지 로딩(loader.py) 시 사용
     # requests/chardet/idna/urllib3 는 이 앱에서 쓰지 않으므로 제외
@@ -38,32 +32,6 @@ class KivyRecipe(_builtin.KivyRecipe):
     def get_recipe_dir(self):
         # 패치 파일(use_cython.patch 등)은 p4a 내장 레시피 폴더에서 찾습니다.
         return os.path.dirname(_BUILTIN)
-
-    def postbuild_arch(self, arch):
-        super().postbuild_arch(arch)
-        self._trim_installed_package(arch.arch)
-
-    def _trim_installed_package(self, arch_name):
-        """번들에 넣지 않아도 되는 Kivy 자산을 지웁니다.
-
-        - kivy/tools : 개발/패키징 도구 (런타임 미사용)
-        - kivy/data/fonts/DejaVuSans.ttf, RobotoMono-Regular.ttf : 미사용 폰트
-
-        Roboto 4종(Roboto-Regular/Italic/Bold/BoldItalic)은 남겨야 합니다.
-        kivy/core/text 가 import 시점에 이 경로들로 기본 폰트를 등록하는데,
-        파일이 없으면 IOError 로 앱이 죽기 때문입니다.
-        """
-        site_packages = self.ctx.get_python_install_dir(arch_name)
-        targets = [
-            os.path.join(site_packages, "kivy", "tools"),
-            os.path.join(site_packages, "kivy", "data", "fonts", "DejaVuSans.ttf"),
-            os.path.join(site_packages, "kivy", "data", "fonts", "RobotoMono-Regular.ttf"),
-        ]
-        for path in targets:
-            if os.path.isdir(path):
-                shutil.rmtree(path, ignore_errors=True)
-            elif os.path.exists(path):
-                os.remove(path)
 
 
 recipe = KivyRecipe()

@@ -38,10 +38,11 @@ jobs:
 
       - name: Build with buildozer (official docker image)
         run: |
-          mkdir -p "$HOME/.buildozer"
+          mkdir -p "$HOME/.buildozer" "$HOME/.android"
           docker run --rm \
             -v "$PWD":/home/user/hostcwd \
             -v "$HOME/.buildozer":/home/user/.buildozer \
+            -v "$HOME/.android":/home/user/.android \
             -e PIP_CONSTRAINT=/home/user/hostcwd/constraints.txt \
             ghcr.io/kivy/buildozer:latest android debug
 
