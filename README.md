@@ -58,6 +58,10 @@ docker run --rm -v "$PWD":/home/user/hostcwd \
   Android 원격 이미지 로딩 경로용으로 유지)
 - **setuptools 제거** — 빌드에만 필요하고 런타임에는 쓰이지 않아 `depends` 에서 뺍니다.
   Python 3.14 번들에는 `pkg_resources` 가 없고 pyjnius 도 3.9+ 에서는 `importlib.resources` 를 씁니다.
+- **표준 라이브러리 정리** — `p4a-recipes/python3` 가 `stdlib_dir_blacklist` 를 확장해
+  이 앱이 쓰지 않는 모듈(asyncio, unittest, multiprocessing, xml, pydoc_data 등)을 번들에서 뺍니다.
+- **Kivy 내장 폰트 제거** — `site_packages_dir_blacklist` 로 `kivy/data/fonts`
+  (Roboto/DejaVu, 약 1.4MB)를 제외합니다. 기본 폰트는 NanumGothic 으로 교체되어 있습니다.
 - **한글 폰트 서브셋** — `tools/subset_fonts.py` 가 UI 코드에 등장하는 글자만 남깁니다.
   전체 폰트는 `font_src/` 에 보관하고 APK 에는 넣지 않습니다(약 4MB → 0.35MB).
   문구를 바꾼 뒤에는 스크립트를 다시 실행하세요.

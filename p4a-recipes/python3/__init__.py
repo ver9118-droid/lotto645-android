@@ -40,22 +40,15 @@ EXTRA_STDLIB_BLACKLIST = {
     "_pyrepl",
 }
 
-# site-packages 안의 불필요한 디렉터리
-#   fonts : Kivy 내장 Roboto/DejaVu 폰트 (기본 폰트는 NanumGothic 으로 교체)
-#   tools : Kivy 개발/패키징 도구
-EXTRA_SITE_PACKAGES_BLACKLIST = {
-    "fonts",
-    "tools",
-}
+# site-packages 안의 불필요한 항목은 Kivy 레시피(p4a-recipes/kivy)의
+# postbuild_arch 에서 개별 파일 단위로 정리합니다.
+# (kivy/data/fonts 전체를 빼면 kivy.core.text 의 import 시점 폰트 등록이
+#  IOError 로 실패하므로 디렉터리 단위 제외는 하지 않습니다.)
 
 
 class Python3Recipe(_builtin.Python3Recipe):
     stdlib_dir_blacklist = (
         set(_builtin.Python3Recipe.stdlib_dir_blacklist) | EXTRA_STDLIB_BLACKLIST
-    )
-    site_packages_dir_blacklist = (
-        set(_builtin.Python3Recipe.site_packages_dir_blacklist)
-        | EXTRA_SITE_PACKAGES_BLACKLIST
     )
 
     def get_recipe_dir(self):
