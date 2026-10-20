@@ -97,8 +97,10 @@ class Python3Recipe(_builtin.Python3Recipe):
     )
 
     def create_python_bundle(self, dirn, arch):
-        super().create_python_bundle(dirn, arch)
+        # 원본이 site-packages 경로를 반환하므로 그대로 돌려줘야 합니다.
+        site_packages = super().create_python_bundle(dirn, arch)
         self._drop_c_modules(dirn)
+        return site_packages
 
     def _drop_c_modules(self, dirn):
         """번들에서 쓰지 않는 C 확장 모듈을 지웁니다."""
