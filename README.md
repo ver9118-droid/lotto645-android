@@ -51,7 +51,7 @@ docker run --rm -v "$PWD":/home/user/hostcwd \
 
 ## APK 크기 최적화
 
-디버그 APK 기준 **22.31 MB → 16.72 MB** (약 25% 감소) 했습니다.
+디버그 APK 기준 **22.31 MB → 15.88 MB** (약 29% 감소) 했습니다.
 
 - **불필요한 파이썬 패키지 제거** — `p4a-recipes/kivy` 가 Kivy 기본
   `python_depends`(requests, chardet, idna, urllib3)를 설치하지 않습니다.
