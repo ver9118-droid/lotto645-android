@@ -55,3 +55,58 @@ jobs:
           name: lotto645-apk
           path: bin/*.apk
           if-no-files-found: error
+
+  # 무한 음악 플레이어 안드로이드 버전.
+  # 이 저장소에 이미 검증된 Android SDK/NDK 캐시가 있으므로 같은 환경을 공유한다.
+  music-apk:
+    name: Build Music Player APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout music player
+        uses: actions/checkout@v4
+        with:
+          repository: ver9118-droid/music-player-android
+          ref: main
+          path: music
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo apt-get clean
+          df -h /
+
+      - name: Cache Android SDK / NDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer/android/platform/android-sdk
+            ~/.buildozer/android/platform/android-ndk-*
+          key: android-sdk-ndk-${{ runner.os }}-v1
+
+      - name: Cache debug keystore (서명 일관성 유지)
+        uses: actions/cache@v4
+        with:
+          path: ~/.android
+          key: android-debug-keystore-v1
+
+      - name: Build with buildozer (official docker image)
+        run: |
+          mkdir -p "$HOME/.buildozer" "$HOME/.android"
+          docker run --rm \
+            -v "$PWD/music":/home/user/hostcwd \
+            -v "$HOME/.buildozer":/home/user/.buildozer \
+            -v "$HOME/.android":/home/user/.android \
+            ghcr.io/kivy/buildozer:latest android debug
+
+      - name: Show result
+        run: ls -lh music/bin/ || true
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: infiniteplayer-apk
+          path: music/bin/*.apk
+          if-no-files-found: error
