@@ -110,6 +110,35 @@ def fetch_one(round_no: int) -> Optional[Draw]:
         return None
 
 
+def fetch_prizes(round_no: int) -> Optional[dict]:
+    """회차별 등급별 1인당 당첨금/당첨자 수 조회 (당첨 확인용)."""
+    ts = int(time.time() * 1000)
+    params = {"srchLtEpsd": round_no, "_": ts}
+    try:
+        r = _get(config.DHLOTTERY_DETAIL_URL, params=params)
+        data = r.json()
+    except Exception:
+        return None
+    lst = (data.get("data") or {}).get("list") or []
+    item = None
+    for e in lst:
+        if e.get("ltEpsd") == round_no:
+            item = e
+            break
+    if item is None:
+        return None
+    prizes = {}
+    winners = {}
+    for rank in range(1, 6):
+        amt = item.get(f"rnk{rank}WnAmt")
+        if amt:
+            prizes[rank] = int(amt)
+        n = item.get(f"rnk{rank}WnNope")
+        if n is not None:
+            winners[rank] = int(n)
+    return {"round": round_no, "prizes": prizes, "winners": winners}
+
+
 def fetch_latest_round_no() -> Optional[int]:
     # Try mirror first
     try:

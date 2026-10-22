@@ -74,7 +74,9 @@ def install_crash_hook():
 install_crash_hook()
 
 from src import config                                    # noqa: E402
+from src import checker                                  # noqa: E402
 from src.data import storage                              # noqa: E402
+from src.data import shops as shops_api                   # noqa: E402
 from src.analysis import stats as S                       # noqa: E402
 from src.recommend import engine as E                     # noqa: E402
 from src.updater import Updater                           # noqa: E402
@@ -834,6 +836,368 @@ class AnalysisScreen(BaseScreen):
                        color=ball_rgba(n)[:3]))
 
 
+class CheckScreen(BaseScreen):
+    """당첨 확인: 번호(직접 입력 / QR 내용물 붙여넣기) → 등급·당첨금 판정."""
+
+    def __init__(self, app, **kw):
+        super().__init__(app, name="check", **kw)
+
+        card = Card()
+        r1 = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(34),
+                       spacing=dp(6))
+        r1.add_widget(Lbl(text="검사 회차", color=FG, font_size=sp(11.5),
+                            size_hint_x=None, width=dp(58),
+                            halign="left", valign="middle"))
+        self.sp_round = Spinner(text="-", values=["-"],
+                                size_hint=(None, None), size=(dp(120), dp(32)),
+                                background_normal="", background_color=CARD,
+                                color=FG, font_size=sp(12), option_cls=DarkOption)
+        self.sp_round.bind(text=lambda *a: self.refresh())
+        r1.add_widget(self.sp_round)
+        r1.add_widget(Lbl(text="", size_hint_x=1))
+        card.add_widget(r1)
+        self.box.add_widget(card)
+
+        card2 = Card()
+        self.hint = Lbl(
+            text="QR은 휴대폰 카메라로 스캔해 복사한 뒤 [붙여넣기]를 누르세요.\n"
+                 "직접 입력도 가능합니다 (한 줄에 번호 6개).",
+            color=MUTED, font_size=sp(9.5), size_hint_y=None, height=dp(30),
+            halign="left", valign="top", text_size=(None, None))
+        card2.add_widget(self.hint)
+        self.ti = TextInput(text="", multiline=True, font_size=sp(12),
+                            background_color=FIELD, foreground_color=FG,
+                            cursor_color=ACCENT, padding=[dp(6), dp(6)],
+                            size_hint_y=None, height=dp(76))
+        card2.add_widget(self.ti)
+
+        row = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(40),
+                        spacing=dp(6))
+        b_paste = FlatButton(text="붙여넣기", bg=C("#2b3546"))
+        b_paste.bind(on_release=lambda *a: self.app.paste_into(self.ti))
+        b_rec = FlatButton(text="추천 검사", bg=C("#2b3546"))
+        b_rec.bind(on_release=lambda *a: self.check_rec_sets())
+        b_run = FlatButton(text="검사", bg=GREEN)
+        b_run.bind(on_release=lambda *a: self.run_check())
+        row.add_widget(b_paste)
+        row.add_widget(b_rec)
+        row.add_widget(b_run)
+        card2.add_widget(row)
+        self.box.add_widget(card2)
+
+        self.card_res = self.section("검사 결과", "")
+        self.holder = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(4))
+        self.holder.bind(minimum_height=self.holder.setter("height"))
+        self.card_res.add_widget(self.holder)
+
+        self.status = Lbl(text="", color=ACCENT, font_size=sp(10),
+                           size_hint_y=None, height=0, halign="left",
+                           text_size=(None, None))
+        self.box.add_widget(self.status)
+
+        self.refresh()
+
+    # ---------- 동작 ----------
+    def set_status(self, msg=None):
+        if msg:
+            self.status.text = msg
+            self.status.height = dp(18)
+        else:
+            self.status.text = ""
+            self.status.height = 0
+
+    def current_round(self):
+        try:
+            return int(self.sp_round.text)
+        except (TypeError, ValueError):
+            return None
+
+    def check_rec_sets(self):
+        sets = self.app.last_sets
+        if not sets:
+            self.set_status("먼저 추천 번호를 생성하세요.")
+            return
+        self.ti.text = "\n".join(
+            " ".join(f"{n:02d}" for n in s["numbers"]) for s in sets)
+        self.run_check()
+
+    def run_check(self):
+        rnd = self.current_round()
+        draws = storage.get_all_draws()
+        if not draws:
+            self.set_status("데이터가 없습니다. 업데이트하세요.")
+            return
+        draw = next((d for d in draws if d.round == rnd), None)
+        if draw is None:
+            draw = draws[-1]
+        tickets = checker.parse_tickets(self.ti.text)
+        if not tickets:
+            self.holder.clear_widgets()
+            self.holder.add_widget(Lbl(text="입력된 번호가 없습니다.",
+                                       color=MUTED, font_size=sp(11),
+                                       size_hint_y=None, height=dp(24)))
+            self.set_status(None)
+            return
+        prizes = self.app.prizes_for(draw)
+        results = [checker.check_numbers(t, draw, prizes) for t in tickets]
+        self.show_results(results, draw)
+
+    def show_results(self, results, draw):
+        self.holder.clear_widgets()
+        head = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(30),
+                         spacing=dp(4))
+        head.add_widget(Lbl(text=f"{draw.round}회", color=MUTED, font_size=sp(10),
+                            size_hint_x=None, width=dp(46)))
+        head.add_widget(ball_row(draw.numbers, size=dp(21), spacing=dp(2)))
+        self.holder.add_widget(head)
+        self.holder.add_widget(Lbl(
+            text="보너스 " + f"{draw.bonus:02d}",
+            color=MUTED, font_size=sp(10), size_hint_y=None, height=dp(16),
+            halign="left", text_size=(None, None)))
+
+        total = 0
+        winners = 0
+        for i, r in enumerate(results, 1):
+            box = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(2))
+            line = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(28),
+                             spacing=dp(4))
+            line.add_widget(Lbl(text=str(i), color=MUTED, font_size=sp(10.5),
+                                size_hint_x=None, width=dp(16)))
+            line.add_widget(ball_row(r["numbers"], size=dp(22), spacing=dp(2)))
+            box.add_widget(line)
+            win = bool(r["rank"])
+            color = GREEN if win else MUTED
+            prize = checker.format_prize(r["prize"]) if win else ""
+            box.add_widget(Lbl(
+                text=f"{r['rank_label']}  {r['detail']}" + (f"   {prize}" if prize else ""),
+                color=color, font_size=sp(11), bold=win,
+                size_hint_y=None, height=dp(18), halign="left",
+                text_size=(None, None)))
+            self.holder.add_widget(box)
+            total += r["prize"]
+            winners += 1 if win else 0
+
+        if winners:
+            self.set_status(f"🎉 당첨 {winners}건  총 당첨금 {checker.format_prize(total)}")
+        else:
+            self.set_status(f"😢 당첨 없음 (검사 {len(results)}표)")
+
+    def refresh(self):
+        draws = storage.get_all_draws()
+        if not draws:
+            return
+        rounds = [str(d.round) for d in draws[-30:]][::-1]
+        cur = self.sp_round.text
+        self.sp_round.values = rounds
+        if cur not in rounds:
+            self.sp_round.text = rounds[0]
+        self.run_check()
+
+
+class ShopScreen(BaseScreen):
+    """당첨매장: 회차별 1등(등) 당첨매장 조회 + 내 주변 검색."""
+
+    def __init__(self, app, **kw):
+        super().__init__(app, name="shop", **kw)
+
+        card = Card()
+        r1 = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(40),
+                       spacing=dp(4))
+        r1.add_widget(Lbl(text="회차", color=FG, font_size=sp(11.5),
+                            size_hint_x=None, width=dp(34),
+                            halign="left", valign="middle"))
+        self.sp_round = Spinner(text="-", values=["-"],
+                                size_hint=(None, None), size=(dp(92), dp(34)),
+                                background_normal="", background_color=CARD,
+                                color=FG, font_size=sp(12), option_cls=DarkOption)
+        r1.add_widget(self.sp_round)
+        r1.add_widget(Lbl(text="등급", color=FG, font_size=sp(11.5),
+                            size_hint_x=None, width=dp(36),
+                            halign="left", valign="middle"))
+        self.sp_rank = Spinner(text="1등", values=["1등", "2등", "전체"],
+                               size_hint=(None, None), size=(dp(76), dp(34)),
+                               background_normal="", background_color=CARD,
+                               color=FG, font_size=sp(12), option_cls=DarkOption)
+        r1.add_widget(self.sp_rank)
+        r1.add_widget(Lbl(text="", size_hint_x=1))
+        card.add_widget(r1)
+
+        r2 = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(44),
+                       spacing=dp(4))
+        r2.add_widget(Lbl(text="내 위치", color=FG, font_size=sp(11.5),
+                            size_hint_x=None, width=dp(48),
+                            halign="left", valign="middle"))
+        self.ti_place = TextInput(text="", multiline=False, font_size=sp(11.5),
+                                  background_color=FIELD, foreground_color=FG,
+                                  cursor_color=ACCENT, padding=[dp(6), dp(8)],
+                                  size_hint=(None, None), size=(dp(200), dp(38)),
+                                  hint_text="주소 또는 지명")
+        r2.add_widget(self.ti_place)
+        r2.add_widget(Lbl(text="", size_hint_x=1))
+        card.add_widget(r2)
+
+        r3 = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(42),
+                       spacing=dp(6))
+        b_find = FlatButton(text="내 주변 찾기", bg=C("#2b3546"))
+        b_find.bind(on_release=lambda *a: self.search_place())
+        b_load = FlatButton(text="당첨매장 조회", bg=GREEN)
+        b_load.bind(on_release=lambda *a: self.load_shops())
+        b_load.size_hint_x = 1.25
+        r3.add_widget(b_find)
+        r3.add_widget(b_load)
+        card.add_widget(r3)
+        self.box.add_widget(card)
+
+        self.card_list = self.section("당첨매장 목록", "")
+        self.holder = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(4))
+        self.holder.bind(minimum_height=self.holder.setter("height"))
+        self.card_list.add_widget(self.holder)
+
+        self.status = Lbl(text="", color=ACCENT, font_size=sp(10),
+                           size_hint_y=None, height=0, halign="left",
+                           text_size=(None, None))
+        self.box.add_widget(self.status)
+
+        self.shops = []
+        self.items = []
+        self.refresh()
+
+    # ---------- 동작 ----------
+    def set_status(self, msg=None):
+        if msg:
+            self.status.text = msg
+            self.status.height = dp(18)
+        else:
+            self.status.text = ""
+            self.status.height = 0
+
+    def current_round(self):
+        try:
+            return int(self.sp_round.text)
+        except (TypeError, ValueError):
+            return None
+
+    def current_rank(self):
+        t = self.sp_rank.text
+        if t.startswith("1"):
+            return 1
+        if t.startswith("2"):
+            return 2
+        return 0
+
+    def refresh(self):
+        draws = storage.get_all_draws()
+        if not draws:
+            return
+        rounds = [str(d.round) for d in draws[-30:]][::-1]
+        cur = self.sp_round.text
+        self.sp_round.values = rounds
+        if cur not in rounds:
+            self.sp_round.text = rounds[0]
+
+    def load_shops(self):
+        rnd = self.current_round()
+        if not rnd:
+            self.set_status("회차를 선택하세요.")
+            return
+        rank = self.current_rank()
+        self.set_status("당첨매장 조회 중...")
+
+        def work():
+            try:
+                data = shops_api.fetch_winning_shops(rnd, rank=rank)
+                err = None
+            except Exception as e:
+                data, err = [], str(e)
+            Clock.schedule_once(lambda *a: self.apply_shops(data, err))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def apply_shops(self, data, err=None):
+        if err:
+            self.set_status(f"조회 실패: {err[:60]}")
+            return
+        self.shops = data
+        self.sort_items()
+        self.set_status(f"{self.current_round()}회 {self.sp_rank.text} 당첨매장 {len(data)}곳")
+
+    def search_place(self):
+        q = (self.ti_place.text or "").strip()
+        if not q:
+            self.set_status("주소나 지명을 입력하세요.")
+            return
+        self.set_status("위치 검색 중...")
+
+        def work():
+            try:
+                geo = shops_api.geocode(q)
+                err = None
+            except Exception as e:
+                geo, err = None, str(e)
+            Clock.schedule_once(lambda *a: self.apply_place(geo, err))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def apply_place(self, geo, err=None):
+        if err:
+            self.set_status(f"위치 검색 실패: {err[:60]}")
+            return
+        if not geo:
+            self.set_status("위치를 찾지 못했습니다.")
+            return
+        self.geo = geo
+        self.sort_items()
+        self.set_status(f"'{geo['short']}' 기준 {len(self.items)}곳")
+
+    def sort_items(self):
+        """현재 위치 기준으로 거리순 정렬(위치 없으면 원래 순서)."""
+        center = getattr(self, "geo", None)
+        if center:
+            self.items = shops_api.sort_by_distance(self.shops,
+                                                    center["lat"], center["lon"])
+        else:
+            self.items = [dict(s, distance_km=None) for s in self.shops]
+        self.holder.clear_widgets()
+        for i, s in enumerate(self.items, 1):
+            self.holder.add_widget(self.shop_row(i, s))
+        if not self.items:
+            self.holder.add_widget(Lbl(text="표시할 매장이 없습니다.",
+                                       color=MUTED, font_size=sp(11),
+                                       size_hint_y=None, height=dp(24)))
+
+    def shop_row(self, idx, s):
+        dist = (shops_api.format_distance(s["distance_km"])
+                if s.get("distance_km") is not None else "-")
+        box = BoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(1))
+        line = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(20),
+                         spacing=dp(6))
+        line.add_widget(Lbl(text=f"{idx}. {s.get('name','')}", color=FG,
+                            font_size=sp(12), halign="left", valign="middle",
+                            text_size=(None, None)))
+        line.add_widget(Lbl(text=dist, color=ACCENT, font_size=sp(11),
+                            size_hint_x=None, width=dp(56), halign="right",
+                            valign="middle", text_size=(None, None)))
+        box.add_widget(line)
+        box.add_widget(Lbl(text=s.get("address", ""), color=MUTED, font_size=sp(10),
+                           size_hint_y=None, height=dp(15), halign="left",
+                           text_size=(None, None)))
+        info = f"{s.get('rank','')}등"
+        if s.get("combo"):
+            info += f" · {s['combo']}"
+        if s.get("tel"):
+            info += f" · {s['tel']}"
+        row = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(30),
+                        spacing=dp(6))
+        row.add_widget(Lbl(text=info, color=MUTED, font_size=sp(10),
+                           halign="left", valign="middle", text_size=(None, None)))
+        b = FlatButton(text="지도에서 보기", bg=C("#2b3546"), height=dp(28),
+                       size_hint_x=None, width=dp(104))
+        b.bind(on_release=lambda *a, sh=s: self.app.open_map(sh))
+        row.add_widget(b)
+        box.add_widget(row)
+        return box
+
+
 class SettingsScreen(BaseScreen):
     def __init__(self, app, **kw):
         super().__init__(app, name="settings", **kw)
@@ -884,13 +1248,14 @@ class SettingsScreen(BaseScreen):
 
         card3 = self.section("앱 정보")
         self.l_about = Lbl(
-            text=("로또 6/45 지능형 추천  v1.0 (Android)\n"
+            text=("로또 6/45 지능형 추천  v1.1 (Android)\n"
                   "추천 엔진: 백테스트 커버리지 기준 1~6순위 전략\n"
+                  "당첨 확인(QR) · 주변 당첨매장 검색 지원\n"
                   "데이터: 동행복권 공식 회차 (미러 자동 동기화)\n\n"
                   "1등 확률은 조합당 1/8,145,060으로 고정이며,\n"
                   "서로 다른 조합 수를 늘리는 것만이 확률을 올립니다.\n"
                   "이 앱은 참고용이며 당첨을 보장하지 않습니다."),
-            color=MUTED, font_size=sp(10.5), size_hint_y=None, height=dp(150),
+            color=MUTED, font_size=sp(10.5), size_hint_y=None, height=dp(162),
             halign="left", valign="top", text_size=(None, None))
         card3.add_widget(self.l_about)
 
@@ -982,13 +1347,16 @@ class LottoApp(App):
         self.home = HomeScreen(self)
         self.rec = RecScreen(self)
         self.analysis = AnalysisScreen(self)
+        self.check = CheckScreen(self)
+        self.shop = ShopScreen(self)
         self.settings_screen = SettingsScreen(self)
-        for s in (self.home, self.rec, self.analysis, self.settings_screen):
+        for s in (self.home, self.rec, self.analysis, self.check,
+                  self.shop, self.settings_screen):
             self.sm.add_widget(s)
         root.add_widget(self.sm)
 
         self.nav = BoxLayout(orientation="horizontal", size_hint_y=None,
-                             height=dp(54), spacing=dp(6), padding=(dp(6), dp(5)))
+                             height=dp(54), spacing=dp(4), padding=(dp(4), dp(5)))
         with self.nav.canvas.before:
             Color(*NAV)
             nav_bg = Rectangle(pos=self.nav.pos, size=self.nav.size)
@@ -996,7 +1364,8 @@ class LottoApp(App):
                       size=lambda *a: setattr(nav_bg, "size", self.nav.size))
         self.nav_btns = {}
         for key, label in (("home", "홈"), ("rec", "추천"),
-                           ("analysis", "분석"), ("settings", "설정")):
+                           ("analysis", "분석"), ("check", "확인"),
+                           ("shop", "매장"), ("settings", "설정")):
             b = NavButton(label, active=(key == "home"))
             b.bind(on_release=lambda inst, k=key: self.goto(k))
             self.nav_btns[key] = b
@@ -1283,8 +1652,93 @@ class LottoApp(App):
             self.settings_screen.refresh()
         elif key == "rec":
             self.rec.refresh()
+        elif key == "check":
+            self.check.refresh()
+        elif key == "shop":
+            self.shop.refresh()
         elif key == "home":
             self.home.refresh()
+
+    # ---------- 당첨 확인 보조 ----------
+    def prizes_for(self, draw):
+        """회차별 등급별 당첨금(1·2·3등은 서버 조회, 4·5등은 고정)."""
+        prizes = {4: checker.FIXED_PRIZES[4], 5: checker.FIXED_PRIZES[5]}
+        if draw.first_prize:
+            prizes[1] = draw.first_prize
+        cached = getattr(self, "_prizes", {}).get(draw.round)
+        if cached:
+            prizes.update(cached)
+        else:
+            self._fetch_prizes(draw.round)
+        return prizes
+
+    def _fetch_prizes(self, rnd):
+        def work():
+            try:
+                from src.data import fetcher
+                info = fetcher.fetch_prizes(rnd)
+            except Exception:
+                info = None
+            if info:
+                Clock.schedule_once(lambda *a: self._set_prizes(rnd, info["prizes"]))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _set_prizes(self, rnd, prizes):
+        if not hasattr(self, "_prizes"):
+            self._prizes = {}
+        self._prizes[rnd] = prizes
+        if self.sm.current == "check":
+            self.check.run_check()
+
+    def paste_into(self, ti):
+        """클립보드 내용을 입력칸에 넣고 검사 (QR 카메라 스캔 결과 붙여넣기)."""
+        text = ""
+        if Clipboard is not None:
+            try:
+                text = Clipboard.paste() or ""
+            except Exception:
+                text = ""
+        if not text:
+            self.toast("클립보드가 비어 있습니다")
+            return
+        ti.text = text
+        if self.sm.current == "check":
+            self.check.run_check()
+
+    # ---------- 지도 ----------
+    def open_map(self, shop):
+        """안드로이드 지도 앱으로 당첨매장 위치 열기."""
+        lat = shop.get("lat")
+        lon = shop.get("lon")
+        if lat is None or lon is None:
+            return
+        name = shop.get("name", "")
+        q = f"{lat},{lon}"
+        if os.environ.get("ANDROID_PRIVATE"):
+            try:
+                from jnius import autoclass
+                PythonActivity = autoclass("org.kivy.android.PythonActivity")
+                Intent = autoclass("android.content.Intent")
+                Uri = autoclass("android.net.Uri")
+                uri = Uri.parse(f"geo:{q}?q={q}({name})")
+                intent = Intent(Intent.ACTION_VIEW, uri)
+                PythonActivity.mActivity.startActivity(intent)
+                return
+            except Exception as e:
+                print("[map] geo intent failed:", e)
+            try:
+                from jnius import autoclass
+                PythonActivity = autoclass("org.kivy.android.PythonActivity")
+                Intent = autoclass("android.content.Intent")
+                Uri = autoclass("android.net.Uri")
+                url = f"https://maps.google.com/?q={q}"
+                intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                PythonActivity.mActivity.startActivity(intent)
+                return
+            except Exception as e:
+                print("[map] browser intent failed:", e)
+        self.toast("지도 앱을 열 수 없습니다")
 
     def refresh_all(self):
         self.home.refresh()
@@ -1296,6 +1750,8 @@ class LottoApp(App):
             self.analysis.refresh()
         if self.sm.current == "settings":
             self.settings_screen.refresh()
+        if self.sm.current == "check":
+            self.check.refresh()
 
 
 if __name__ == "__main__":

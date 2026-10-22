@@ -4,7 +4,7 @@ import os
 import sys
 
 APP_NAME = "Korean Lotto 6/45 Intelligent Recommender"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 
 _override = os.environ.get("LOTTO_DATA_DIR")
 if _override:
